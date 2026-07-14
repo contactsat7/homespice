@@ -12,6 +12,7 @@ service cloud.firestore {
     function isAdmin() {
       return isSignedIn() && (
         request.auth.token.email in [
+          'jsn.marimuthu@gmail.com',
           'homespiceadmin@gmail.com',
           'admin@homespice.com.au',
           'contactsat7@gmail.com'

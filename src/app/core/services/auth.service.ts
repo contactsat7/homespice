@@ -12,12 +12,14 @@ import {
 import { Router } from '@angular/router';
 import { environment } from '../../../environments/environment';
 import { UserProfile } from '../models';
+import { ToastService } from './toast.service';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private auth   = inject(Auth);
   private fs     = inject(Firestore);
   private router = inject(Router);
+  private toast  = inject(ToastService);
 
   readonly user      = signal<User | null>(null);
   readonly profile   = signal<UserProfile | null>(null);
@@ -30,10 +32,16 @@ export class AuthService {
     this.gProvider.addScope('email');
     this.gProvider.addScope('profile');
 
-    // Handle redirect result first
+    // Handle redirect result first (used as a fallback when the popup
+    // is blocked or the domain isn't allowed to open one). Errors here
+    // were previously swallowed silently — the user would click
+    // "Sign in with Google", get redirected to Google, come back, and
+    // nothing would happen with no explanation. Now we surface it.
     getRedirectResult(this.auth).then(result => {
       if (result?.user) this.onSignedIn(result.user);
-    }).catch(() => {});
+    }).catch(err => {
+      this.toast.error(this.friendlyGoogleError(err));
+    });
 
     // Auth state observer
     onAuthStateChanged(this.auth, async user => {
@@ -48,6 +56,14 @@ export class AuthService {
     });
   }
 
+  private friendlyGoogleError(err: any): string {
+    const code = err?.code ?? '';
+    if (code === 'auth/unauthorized-domain') {
+      return 'Google sign-in isn\'t enabled for this website address yet. Please contact us or try again later.';
+    }
+    return 'Google sign-in failed: ' + (err?.message || code || 'unknown error');
+  }
+
   /** Google sign-in: popup with redirect fallback */
   async signInWithGoogle(): Promise<void> {
     try {
@@ -60,10 +76,10 @@ export class AuthService {
         'auth/unauthorized-domain',
         'auth/operation-not-supported-in-this-environment'
       ];
-      if (blocked.includes(err.code)) {
+      if (blocked.includes(err.code) && err.code !== 'auth/unauthorized-domain') {
         await signInWithRedirect(this.auth, this.gProvider);
       } else {
-        throw err;
+        throw new Error(this.friendlyGoogleError(err));
       }
     }
   }

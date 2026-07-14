@@ -359,7 +359,7 @@ export class AppComponent implements OnInit {
       await this.auth.signInWithGoogle();
       this.closeAuth();
     } catch (e: any) {
-      this.authError.set('Google sign-in failed: ' + (e.message || e.code));
+      this.authError.set(e.message || 'Google sign-in failed: ' + e.code);
     } finally {
       this.authLoading.set(false);
     }

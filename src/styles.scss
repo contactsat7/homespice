@@ -2,9 +2,10 @@
    Jaannz Spicy Spoon — Global Styles
    Angular 18 · SCSS with CSS custom properties
    Light mode
+   Google Fonts are loaded via <link> in src/index.html —
+   not imported here, so the production build doesn't need
+   network access to fonts.googleapis.com at build time.
    ============================================================ */
-
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400;1,700&family=Poppins:wght@300;400;500;600;700&display=swap');
 
 /* ── Light mode variables ──────────────────────────── */
 :root {
