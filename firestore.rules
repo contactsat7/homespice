@@ -1,0 +1,61 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helpers ──────────────────────────────────────────────
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email in [
+          'homespiceadmin@gmail.com',
+          'admin@homespice.com.au',
+          'contactsat7@gmail.com'
+        ] ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    // ── Menu items ────────────────────────────────────────────
+    match /menu/{itemId} {
+      allow read: if true;                      // Anyone can read menu
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ── Orders ───────────────────────────────────────────────
+    match /orders/{orderId} {
+      allow create: if true;                    // Guests can place orders
+      allow read:   if isAdmin()
+                    || (isSignedIn() && resource.data.userId == request.auth.uid)
+                    || (isSignedIn() && resource.data.customer.email == request.auth.token.email);
+      allow update: if isAdmin();               // Only admin changes status
+      allow delete: if isAdmin();
+    }
+
+    // ── Users ─────────────────────────────────────────────────
+    match /users/{uid} {
+      allow read:   if isOwner(uid) || isAdmin();
+      allow create: if isSignedIn() && request.auth.uid == uid;
+      allow update: if isOwner(uid) || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ── Admins ────────────────────────────────────────────────
+    match /admins/{uid} {
+      allow read:   if isSignedIn();
+      allow write:  if isAdmin();
+    }
+
+    // ── Loyalty points ────────────────────────────────────────
+    match /loyalty/{docId} {
+      allow create: if true;
+      allow read:   if isAdmin()
+                    || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow update, delete: if isAdmin();
+    }
+  }
+}
