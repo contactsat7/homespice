@@ -21,15 +21,10 @@ export class MenuService {
     const ref = collection(this.fs, 'menu');
     const q   = query(ref, orderBy('category'), orderBy('name'));
     collectionData(q, { idField: 'id' }).pipe(
-      catchError(() => of([]))
+      catchError(err => { console.error('Menu load error:', err); return of([]); })
     ).subscribe(items => {
-      if (items.length === 0) {
-        // Seed on first run
-        this.seedMenu().then(() => this.loadMenu());
-      } else {
-        this.items.set(items as MenuItem[]);
-        this.loading.set(false);
-      }
+      this.items.set(items as MenuItem[]);
+      this.loading.set(false);
     });
   }
 
@@ -81,6 +76,8 @@ export class MenuService {
   getFeatured(): MenuItem[] {
     const featured = ['Butter Chicken', 'Chicken Biryani', 'Paneer Butter Masala',
                       'Masala Dosa', 'Chicken Tikka', 'Mango Lassi'];
-    return this.items().filter(i => featured.includes(i.name)).slice(0, 6);
+    const named = this.items().filter(i => featured.includes(i.name) && i.available);
+    if (named.length > 0) return named.slice(0, 6);
+    return this.items().filter(i => i.available).slice(0, 6);
   }
 }

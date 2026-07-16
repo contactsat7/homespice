@@ -12,6 +12,28 @@ export interface MenuItem {
   available: boolean;
   createdAt?: any;
   updatedAt?: any;
+  // Discounting
+  discountPercent?: number;      // 0-100, e.g. 15 = 15% off
+  discountActive?: boolean;
+  // Time-window availability (independent of the manual `available` toggle).
+  // If scheduleEnabled is false/unset, the item follows `available` only.
+  scheduleEnabled?: boolean;
+  availableFrom?: string;        // '06:00' (24h, local restaurant time)
+  availableTo?: string;          // '11:00'
+  availableDays?: string[];      // ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']; empty/undefined = every day
+}
+
+export interface Coupon {
+  id?: string;
+  code: string;               // stored uppercase, e.g. 'WELCOME10'
+  type: 'percent' | 'fixed';
+  value: number;               // 10 = 10% (percent) or $10 (fixed)
+  minOrder?: number;
+  active: boolean;
+  usageLimit?: number;         // undefined/0 = unlimited
+  usedCount?: number;
+  expiresAt?: any;             // Firestore Timestamp
+  createdAt?: any;
 }
 
 export interface CartItem {
@@ -39,6 +61,8 @@ export interface Order {
   items: CartItem[];
   subtotal: number;
   gst: number;
+  discount?: number;
+  couponCode?: string;
   total: number;
   paymentMethod: 'eway' | 'cash';
   ewayTransactionId?: string;

@@ -6,6 +6,7 @@ import { MenuService } from '../../core/services/menu.service';
 import { CartService } from '../../core/services/cart.service';
 import { ToastService } from '../../core/services/toast.service';
 import { MenuItem, MENU_CATEGORIES, MenuCategory } from '../../core/models';
+import { isOrderableNow, isWithinSchedule, effectivePrice, scheduleLabel } from '../../core/models/availability';
 
 @Component({
   selector: 'hs-menu',
@@ -69,16 +70,31 @@ import { MenuItem, MENU_CATEGORIES, MenuCategory } from '../../core/models';
               <div class="card-img">
                 <img [src]="item.image" [alt]="item.name" loading="lazy" (error)="onImgErr($event)">
                 <div class="diet-pin" [ngClass]="dietClass(item.diet)">{{ dietLabel(item.diet) }}</div>
-                @if (!item.available) { <div class="unavail-mask">Currently Unavailable</div> }
+                @if (item.discountActive && item.discountPercent) {
+                  <div class="disc-pin">-{{ item.discountPercent }}%</div>
+                }
+                @if (!item.available) {
+                  <div class="unavail-mask">Currently Unavailable</div>
+                } @else if (!isWithinSchedule(item)) {
+                  <div class="unavail-mask">{{ scheduleLabel(item) }}</div>
+                }
               </div>
               <div class="card-b">
                 <div class="card-cat">{{ item.category }}</div>
                 <div class="card-nm">{{ item.name }}</div>
                 <div class="card-ds">{{ item.description }}</div>
                 <div class="card-ing"><strong>Ingredients:</strong> {{ item.ingredients }}</div>
+                @if (item.scheduleEnabled && isWithinSchedule(item)) {
+                  <div class="sched-tag">🕐 {{ scheduleLabel(item) }}</div>
+                }
                 <div class="card-ft">
-                  <div class="card-pr">{{ item.price | currency:'AUD':'symbol-narrow':'1.2-2' }} <small>AUD</small></div>
-                  <button class="atc" [disabled]="!item.available" (click)="addToCart(item)">+</button>
+                  <div class="card-pr">
+                    @if (item.discountActive && item.discountPercent) {
+                      <span style="text-decoration:line-through;color:var(--text-light);font-size:.82em;margin-right:.35rem">{{ item.price | currency:'AUD':'symbol-narrow':'1.2-2' }}</span>
+                    }
+                    {{ price(item) | currency:'AUD':'symbol-narrow':'1.2-2' }} <small>AUD</small>
+                  </div>
+                  <button class="atc" [disabled]="!orderable(item)" (click)="addToCart(item)">+</button>
                 </div>
               </div>
             </div>
@@ -93,6 +109,8 @@ import { MenuItem, MENU_CATEGORIES, MenuCategory } from '../../core/models';
     .menu-tabs .mtab:hover,.menu-tabs .mtab.on { border-color:var(--green);background:var(--green);color:#fff; }
     .vtbtn { width:36px;height:36px;border-radius:8px;border:2px solid var(--border);background:var(--bg-card);display:flex;align-items:center;justify-content:center;font-size:.9rem;color:var(--text-light);transition:all .3s;cursor:pointer; }
     .vtbtn.on,.vtbtn:hover { border-color:var(--green);color:var(--green);background:var(--green-l); }
+    .disc-pin { position:absolute;top:.6rem;left:.6rem;background:#c62828;color:#fff;font-size:.7rem;font-weight:800;padding:.25rem .55rem;border-radius:6px; }
+    .sched-tag { font-size:.72rem;color:var(--text-light);background:var(--bg-alt);display:inline-block;padding:.2rem .5rem;border-radius:6px;margin-bottom:.5rem; }
   `]
 })
 export class MenuComponent implements OnInit {
@@ -135,9 +153,15 @@ export class MenuComponent implements OnInit {
   setCategory(cat: MenuCategory) { this.activeCategory.set(cat); }
 
   addToCart(item: MenuItem) {
-    this.cartService.add({ id: item.id, name: item.name, price: item.price, image: item.image, diet: item.diet });
+    if (!isOrderableNow(item)) { this.toast.error('This item isn\'t available right now.'); return; }
+    this.cartService.add({ id: item.id, name: item.name, price: effectivePrice(item), image: item.image, diet: item.diet });
     this.toast.success(`${item.name} added to cart! 🛒`);
   }
+
+  price(item: MenuItem) { return effectivePrice(item); }
+  orderable(item: MenuItem) { return isOrderableNow(item); }
+  isWithinSchedule(item: MenuItem) { return isWithinSchedule(item); }
+  scheduleLabel(item: MenuItem) { return scheduleLabel(item); }
 
   catEmoji(cat: string): string {
     const map: Record<string,string> = { All:'🍽️',Breakfast:'🌅',Lunch:'☀️',Snacks:'🥪',Dinner:'🌙',Drinks:'🥤' };

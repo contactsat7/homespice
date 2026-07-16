@@ -51,6 +51,14 @@ service cloud.firestore {
       allow write:  if isAdmin();
     }
 
+    // ── Coupons ──────────────────────────────────────────────
+    match /coupons/{couponId} {
+      allow read:   if true;                    // Needed so checkout can validate a code (mirrors public menu read)
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin()
+                    || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['usedCount']); // allow usage-count bump on order, incl. guest checkout
+    }
+
     // ── Loyalty points ────────────────────────────────────────
     match /loyalty/{docId} {
       allow create: if true;

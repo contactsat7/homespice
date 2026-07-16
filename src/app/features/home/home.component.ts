@@ -5,6 +5,7 @@ import { MenuService } from '../../core/services/menu.service';
 import { CartService } from '../../core/services/cart.service';
 import { ToastService } from '../../core/services/toast.service';
 import { MenuItem } from '../../core/models';
+import { isOrderableNow, effectivePrice } from '../../core/models/availability';
 
 @Component({
   selector: 'hs-home',
@@ -57,6 +58,10 @@ import { MenuItem } from '../../core/models';
       </div>
       @if (menuService.loading()) {
         <div style="text-align:center;padding:3rem;color:var(--text-light)">Loading menu… 🍛</div>
+      } @else if (featured().length === 0) {
+        <div style="text-align:center;padding:3rem;color:var(--text-light)">
+          <p>Our menu is being freshly prepared — check back shortly, or view the <a routerLink="/menu" style="color:var(--green);font-weight:600">full menu page</a>.</p>
+        </div>
       } @else {
         <div class="mgrid">
           @for (item of featured(); track item.id) {
@@ -72,8 +77,13 @@ import { MenuItem } from '../../core/models';
                 <div class="card-ds">{{ item.description }}</div>
                 <div class="card-ing"><strong>Ingredients:</strong> {{ item.ingredients }}</div>
                 <div class="card-ft">
-                  <div class="card-pr">{{ item.price | currency:'AUD':'symbol-narrow':'1.2-2' }} <small>AUD</small></div>
-                  <button class="atc" [disabled]="!item.available" (click)="addToCart(item)" title="Add to cart">+</button>
+                  <div class="card-pr">
+                    @if (item.discountActive && item.discountPercent) {
+                      <span style="text-decoration:line-through;color:var(--text-light);font-size:.82em;margin-right:.35rem">{{ item.price | currency:'AUD':'symbol-narrow':'1.2-2' }}</span>
+                    }
+                    {{ price(item) | currency:'AUD':'symbol-narrow':'1.2-2' }} <small>AUD</small>
+                  </div>
+                  <button class="atc" [disabled]="!orderable(item)" (click)="addToCart(item)" title="Add to cart">+</button>
                 </div>
               </div>
             </div>
@@ -222,9 +232,13 @@ export class HomeComponent implements OnInit, AfterViewInit {
   }
 
   addToCart(item: MenuItem) {
-    this.cartService.add({ id: item.id, name: item.name, price: item.price, image: item.image, diet: item.diet });
+    if (!isOrderableNow(item)) { this.toast.error('This item isn\'t available right now.'); return; }
+    this.cartService.add({ id: item.id, name: item.name, price: effectivePrice(item), image: item.image, diet: item.diet });
     this.toast.success(`${item.name} added to cart! 🛒`);
   }
+
+  price(item: MenuItem) { return effectivePrice(item); }
+  orderable(item: MenuItem) { return isOrderableNow(item); }
 
   dietClass(diet: string) {
     return { dv: diet === 'veg', dva: diet === 'vegan', dnv: diet === 'nonveg' };

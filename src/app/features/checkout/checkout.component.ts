@@ -6,6 +6,8 @@ import { CartService } from '../../core/services/cart.service';
 import { OrderService } from '../../core/services/order.service';
 import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
+import { CouponService } from '../../core/services/coupon.service';
+import { Coupon } from '../../core/models';
 
 @Component({
   selector: 'hs-checkout',
@@ -98,14 +100,34 @@ import { ToastService } from '../../core/services/toast.service';
               }
               <div style="margin-top:1rem">
                 <div class="sum-row"><span>Subtotal</span><span>{{ cart.subtotal() | currency:'AUD':'symbol-narrow':'1.2-2' }}</span></div>
-                <div class="sum-row"><span>GST (10%)</span><span>{{ cart.gst() | currency:'AUD':'symbol-narrow':'1.2-2' }}</span></div>
+                @if (appliedDiscount() > 0) {
+                  <div class="sum-row" style="color:var(--green)"><span>Discount {{ appliedCoupon()?.code ? '(' + appliedCoupon()!.code + ')' : '' }}</span><span>−{{ appliedDiscount() | currency:'AUD':'symbol-narrow':'1.2-2' }}</span></div>
+                }
+                <div class="sum-row"><span>GST (10%)</span><span>{{ gst() | currency:'AUD':'symbol-narrow':'1.2-2' }}</span></div>
                 <div class="sum-row"><span>Delivery</span><span style="color:var(--green)">Free</span></div>
-                <div class="sum-row tot"><span>Total</span><span>{{ cart.total() | currency:'AUD':'symbol-narrow':'1.2-2' }}</span></div>
+                <div class="sum-row tot"><span>Total</span><span>{{ total() | currency:'AUD':'symbol-narrow':'1.2-2' }}</span></div>
+              </div>
+
+              <div style="margin:1rem 0">
+                @if (!appliedCoupon()) {
+                  <div style="display:flex;gap:.5rem">
+                    <input type="text" class="fc" style="text-transform:uppercase" placeholder="Coupon code" [(ngModel)]="couponInput" (keyup.enter)="applyCoupon()">
+                    <button class="btn btn-ol btn-sm" (click)="applyCoupon()" [disabled]="couponChecking()">{{ couponChecking() ? '…' : 'Apply' }}</button>
+                  </div>
+                } @else {
+                  <div style="display:flex;justify-content:space-between;align-items:center;background:var(--green-ll);border-radius:8px;padding:.6rem 1rem;font-size:.82rem">
+                    <span>🏷️ <strong>{{ appliedCoupon()!.code }}</strong> applied</span>
+                    <span (click)="removeCoupon()" style="cursor:pointer;color:var(--text-light)" title="Remove">✕</span>
+                  </div>
+                }
+                @if (couponMsg() && !appliedCoupon()) {
+                  <p style="font-size:.75rem;color:#c62828;margin-top:.4rem">{{ couponMsg() }}</p>
+                }
               </div>
 
               @if (auth.user()) {
                 <div style="background:var(--gold-l);border-radius:8px;padding:.7rem 1rem;margin:1rem 0;font-size:.8rem">
-                  🌟 You'll earn <strong>{{ cart.total() | number:'1.0-0' }}</strong> loyalty points with this order!
+                  🌟 You'll earn <strong>{{ total() | number:'1.0-0' }}</strong> loyalty points with this order!
                 </div>
               }
 
@@ -129,6 +151,7 @@ export class CheckoutComponent implements OnInit {
   orders  = inject(OrderService);
   auth    = inject(AuthService);
   toast   = inject(ToastService);
+  coupons = inject(CouponService);
   router  = inject(Router);
 
   name     = '';  phone = '';  email = '';  address = '';
@@ -136,6 +159,15 @@ export class CheckoutComponent implements OnInit {
   orderType = 'delivery';
   payMethod = signal<'eway'|'cash'>('eway');
   placing   = signal(false);
+
+  couponInput     = '';
+  couponChecking  = signal(false);
+  couponMsg       = signal('');
+  appliedCoupon   = signal<Coupon | null>(null);
+  appliedDiscount = signal(0);
+
+  gst   = computed(() => Math.max(0, this.cart.subtotal() - this.appliedDiscount()) * 0.10);
+  total = computed(() => Math.max(0, this.cart.subtotal() - this.appliedDiscount()) + this.gst());
 
   ngOnInit() {
     // Pre-fill from logged-in user
@@ -150,6 +182,33 @@ export class CheckoutComponent implements OnInit {
     this.cardNum = this.cardNum.replace(/\D/g,'').slice(0,16).replace(/(\d{4})(?=\d)/g,'$1 ');
   }
   onImgErr(e: Event) { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1585937421612-70a008356fbe?w=80&q=60'; }
+
+  async applyCoupon() {
+    if (!this.couponInput.trim()) return;
+    this.couponChecking.set(true);
+    this.couponMsg.set('');
+    try {
+      const result = await this.coupons.validate(this.couponInput, this.cart.subtotal());
+      if (result.ok && result.coupon) {
+        this.appliedCoupon.set(result.coupon);
+        this.appliedDiscount.set(result.discount ?? 0);
+        this.toast.success(result.message);
+      } else {
+        this.couponMsg.set(result.message);
+      }
+    } catch {
+      this.couponMsg.set('Could not validate coupon right now. Please try again.');
+    } finally {
+      this.couponChecking.set(false);
+    }
+  }
+
+  removeCoupon() {
+    this.appliedCoupon.set(null);
+    this.appliedDiscount.set(0);
+    this.couponInput = '';
+    this.couponMsg.set('');
+  }
 
   async placeOrder() {
     if (!this.name.trim())  { this.toast.error('Please enter your name.'); return; }
@@ -181,8 +240,10 @@ export class CheckoutComponent implements OnInit {
         },
         items:          this.cart.items(),
         subtotal:       this.cart.subtotal(),
-        gst:            this.cart.gst(),
-        total:          this.cart.total(),
+        gst:            this.gst(),
+        discount:       this.appliedDiscount(),
+        couponCode:     this.appliedCoupon()?.code,
+        total:          this.total(),
         paymentMethod:  this.payMethod(),
         ewayTransactionId,
         ewayAuthCode,
@@ -190,6 +251,10 @@ export class CheckoutComponent implements OnInit {
         userId:         this.auth.currentUser?.uid ?? null as any,
         tableNum:       localStorage.getItem('hs_table') ?? null
       });
+
+      if (this.appliedCoupon()?.id) {
+        this.coupons.recordUsage(this.appliedCoupon()!.id!);
+      }
 
       this.cart.clear();
       this.router.navigate(['/order-confirm', orderId]);
