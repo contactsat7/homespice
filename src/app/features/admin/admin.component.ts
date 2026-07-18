@@ -32,7 +32,6 @@ const DAY_OPTS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
           <a [class.on]="tab()==='coupons'" (click)="tab.set('coupons');coupons.loadAll()">🏷️ Coupons</a>
           <a [class.on]="tab()==='orders'" (click)="tab.set('orders')">📦 Orders</a>
           <a [class.on]="tab()==='users'" (click)="tab.set('users');userAdmin.loadAll()">👥 Users</a>
-          <a [class.on]="tab()==='qr'" (click)="tab.set('qr')">📱 QR Codes</a>
         </nav>
         <div style="position:absolute;bottom:2rem;left:0;right:0;padding:0 1.5rem">
           <p style="font-size:.72rem;color:rgba(255,255,255,.45);margin-bottom:.5rem;word-break:break-all">{{ auth.user()?.email }}</p>
@@ -50,7 +49,6 @@ const DAY_OPTS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
           <button [class.on]="tab()==='coupons'" (click)="tab.set('coupons');coupons.loadAll()">🏷️</button>
           <button [class.on]="tab()==='orders'" (click)="tab.set('orders')">📦</button>
           <button [class.on]="tab()==='users'" (click)="tab.set('users');userAdmin.loadAll()">👥</button>
-          <button [class.on]="tab()==='qr'" (click)="tab.set('qr')">📱</button>
         </div>
 
         <!-- OVERVIEW / ANALYTICS -->
@@ -319,23 +317,6 @@ const DAY_OPTS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
           <p style="font-size:.75rem;color:var(--text-light);margin-top:1rem">🔒 For everyone's safety, card and payment details are never stored by this app — eWAY processes and holds those. This table only shows account and loyalty info.</p>
         }
 
-        <!-- QR CODES -->
-        @if (tab() === 'qr') {
-          <div class="adm-topbar">
-            <h2>QR Code Generator</h2>
-          </div>
-          <p style="margin-bottom:1rem;color:var(--text-mid)">Each table gets a unique URL. Customers scan to see the menu and order directly.</p>
-          <div class="qr-grid">
-            @for (t of tables; track t) {
-              <div class="qr-card">
-                <div class="qr-ph"><span class="qr-ph-ico">📱</span><div style="font-size:.65rem;color:var(--text-light);margin-top:.4rem;word-break:break-all">{{ qrUrl(t) }}</div></div>
-                <div class="qr-lbl">Table {{ t }}</div>
-                <button class="abtn abtn-e" style="width:100%;justify-content:center" (click)="copyQR(t)">📋 Copy Link</button>
-              </div>
-            }
-          </div>
-        }
-
       </div>
     </div>
   </div>
@@ -485,7 +466,7 @@ export class AdminComponent implements OnInit {
   coupons    = inject(CouponService);
   userAdmin  = inject(UserAdminService);
 
-  tab        = signal<'overview'|'menu'|'coupons'|'orders'|'users'|'qr'>('overview');
+  tab        = signal<'overview'|'menu'|'coupons'|'orders'|'users'>('overview');
   allOrders  = signal<Order[]>([]);
   showItemModal = signal(false);
   editingId  = signal<string|null>(null);
@@ -493,7 +474,6 @@ export class AdminComponent implements OnInit {
   previewSrc = signal('');
   menuSearch = '';
   menuCatFilter = '';
-  tables     = Array.from({length:20},(_,i)=>i+1);
   dayOpts    = DAY_OPTS;
 
   showCouponModal  = signal(false);
@@ -745,9 +725,6 @@ export class AdminComponent implements OnInit {
     try { await this.orderSvc.updateStatus(id, status as any); this.toast.success('Status updated'); }
     catch(e: any) { this.toast.error('Update failed'); }
   }
-
-  qrUrl(table: number) { return `${window.location.origin}/menu?table=${table}`; }
-  copyQR(t: number)    { navigator.clipboard.writeText(this.qrUrl(t)).then(() => this.toast.success(`Table ${t} link copied!`)); }
 
   onModalOverlay(e: MouseEvent) { if ((e.target as HTMLElement).classList.contains('amodal-ov')) this.showItemModal.set(false); }
 

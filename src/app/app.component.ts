@@ -150,7 +150,6 @@ import { ToastService } from './core/services/toast.service';
       <div class="foot-disc">⚠️ <strong>Disclaimer:</strong> Food images are for illustration purposes only. Actual dishes may differ in appearance from photographs. All food is freshly prepared using traditional recipes and fresh ingredients.</div>
       <div class="foot-bot">
         <p>© 2026 Jaannz Spicy Spoon. All rights reserved.</p>
-        <p>Built with ❤️ in 🇦🇺 Australia</p>
         <p><a routerLink="/privacy" style="color:var(--gold)">Privacy Policy</a></p>
       </div>
     </div>
